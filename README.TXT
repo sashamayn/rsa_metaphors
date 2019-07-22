@@ -3,6 +3,7 @@ The .pdf document 'metaphor_paper.pdf' is the paper itself in which the model is
 The .py executable 'metaphor_source.py' is the implementation of the proposed model. It takes in the priors (refered to as the 'demo dataset' in the paper) contained in 'typicalities.csv'. It does not take any command line arguments. To run it, type in the terminal window: python3 metaphor_source.py. It will print out the intepretations for each intention-utterance pair. For example output, see Appendix 7.2 in the paper.
 
 Here are a couple of examples of the model's predictions. 
+
 In the example below, 'lazy' has 0 typicality for ants (see the dataset), therefore it has high salience. The example below is therefore in the specific, low salience condition and corresponds to the experimental data point "Is John lazy? John is an ant." Probability displayed is the maximum probability of an interpretation for this intention-utterance pair. The model predicts that the person intends to say that John is a human who is not at all lazy.
 
 The person wanted to communicate the feature: LAZY  
