@@ -31,10 +31,12 @@ def typicalities_setup():
 
 class System:
 	def __init__(self):
+		mu = 0.5
+		kappa = 4
 		self.typicality_matrix, self.animals, self.features = typicalities_setup()
-		self.salience_matrix = abs(self.typicality_matrix - 0.5) ** 4
+		self.salience_matrix = abs(self.typicality_matrix - mu) ** kappa
 		self.salience_matrix[np.where(self.salience_matrix == 0)] = 0.01
-		self.salience_matrix /= self.salience_matrix.sum(axis=1, keepdims=True)
+		self.salience_matrix /= self.salience_matrix.sum(axis=0, keepdims=True) 
 		#print(self.salience_matrix)
 
 		#literal listener
@@ -53,12 +55,11 @@ class System:
 
 	#pragmatic speaker
 	'''
-	intention = goal in Kao et al.; 
-	specific (to communicate this feature; p = 0.5)
+	intention = goal in Kao et al. = conversational context:
+	specific (to communicate this feature)
 	or general (uniform distribution)
 	'''
-	def L1(self, cat, f, p_fi, utterance, lamb):
-		
+	def L1(self, cat, f, utterance, lamb, joint_matrix, intention):
 
 		s1 = self.S1(f, utterance, lamb)
 
@@ -68,29 +69,50 @@ class System:
 		else: 
 			p_c = 0.01
 
-		p_fc = self.salience_matrix[self.features.index(f),self.animals.index(cat)]
-		return p_c*p_fc*p_fi*s1
+		row = self.features.index(f)
+
+		if intention == 'uniform': #last column
+			col = np.size(joint_matrix,1)-1
+		else:
+			col = self.features.index(intention)
+
+		p_fi_given_c = joint_matrix[row,col]
+
+		return p_c*s1*p_fi_given_c
 
 		#prepares the numbers and computes the predictions of L1
 	def meta_l(self, utterance, intention, lamb):
-		if intention in self.features:
-			intentions = [
-				0.5 if f == intention else 0.5 / (len(intention) - 1)
-				for f in self.features
-			]
-		else:
-			intentions = [1 / len(intention) for f in self.features]
+		'''
+		n_match - parameter in p(f,i|c) when f=i
+		n_mismatch - parameter in p(f,i|c) when f!=i
+		'''
+		n_match = 4
+		n_mismatch = 0.25
 
 
 		L1_matrix = np.empty(shape=self.typicality_matrix.shape)
-		for row in range(L1_matrix.shape[0]):
-			for column in range(L1_matrix.shape[1]):
+		num_cols = np.size(self.typicality_matrix,0)
+		for column in range(L1_matrix.shape[1]):
+			joint_matrix = np.array([self.salience_matrix[:,column],]*(num_cols+1)).transpose()
+
+			for rj in range(joint_matrix.shape[0]):
+				for cj in range(joint_matrix.shape[1]):
+					if rj == cj:
+						joint_matrix[rj,cj]*=n_match
+					elif cj!=(joint_matrix.shape[1]-1):
+						joint_matrix[rj,cj]*=n_mismatch
+
+						#renormalize
+			joint_matrix /= np.sum(joint_matrix)
+
+			for row in range(L1_matrix.shape[0]): #for each feature; can switch?
 				L1_matrix[row,column] = self.L1(
 					self.animals[column],
 					self.features[row],
-					intentions[row],
 					utterance,
-					lamb)
+					lamb,
+					joint_matrix, intention)
+
 
 		prob = L1_matrix.max()
 		r, c = np.where(L1_matrix == prob)
@@ -107,9 +129,10 @@ class System:
 			c = c[0]
 		feat = self.features[r]
 		anim = self.animals[c]
-		typicality = self.typicality_matrix[r, self.animals.index(utterance)]
+		typ = self.typicality_matrix[r, self.animals.index(utterance)]
+		sal = self.salience_matrix[r,self.animals.index(utterance)]
 
-		return anim, feat, prob, typicality
+		return anim, feat, prob, typ, sal, self.salience_matrix
 
 
 def main():
@@ -118,11 +141,13 @@ def main():
 
 	for intention in s.features + ['uniform']:
 		for utterance in s.animals:
-			anim, feat, prob, typ = s.meta_l(utterance, intention, lamb)
-			print("The person wanted to communicate the feature:",intention.upper())
-			print("To do that, she uttered:",utterance.upper())
-			print("The model's inference was that she meant", anim.upper(), "with the feature ", feat.upper())
+			anim, feat, prob, typ, sal, salience_matrix = s.meta_l(utterance, intention, lamb)
+			
+			print("Conversational context:",intention.upper())
+			print("Speaker's utterance:",utterance.upper())
+			print("Model's inference is", anim.upper(), "with the feature ", feat.upper())
 			print("Probability of the prediction: ", round(prob,4))
-			print("Typicality of the feature ", feat.upper(), " for ", utterance.upper(), ": ", round(typ,4),"\n")
-
+			print("Typicality of the feature ", feat.upper(), " for ", utterance.upper(), ": ", round(typ,4))
+			print("Salience of the feature ", feat.upper(), " for ", utterance.upper(), ": ", round(sal,4),"\n")
+	
 main()
